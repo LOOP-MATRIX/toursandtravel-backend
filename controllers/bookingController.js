@@ -324,3 +324,102 @@ exports.getUserBookings = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+// Get all bookings
+exports.getAllBookings = async (req, res) => {
+    try {
+        // Get query parameters for pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Get total count of bookings
+        const totalBookings = await Booking.countDocuments();
+
+        // Get bookings with pagination
+        const bookings = await Booking.find()
+            .sort({ bookingDate: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        // Enhance bookings with transport details
+        const enhancedBookings = await Promise.all(bookings.map(async (booking) => {
+            const transport = await Transport.findById(booking.transportId);
+            return {
+                ...booking.toObject(),
+                transportDetails: transport ? {
+                    type: transport.type,
+                    name: transport.name,
+                    source: transport.source,
+                    destination: transport.destination,
+                    departureTime: transport.departureTime,
+                    arrivalTime: transport.arrivalTime
+                } : null
+            };
+        }));
+
+        res.json({
+            bookings: enhancedBookings,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalBookings / limit),
+                totalBookings,
+                hasMore: page * limit < totalBookings
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getTransportBookings = async (req, res) => {
+    try {
+        const { transportId } = req.params;
+        
+        if (!transportId) {
+            return res.status(400).json({ error: 'Transport ID is required' });
+        }
+
+        // Get query parameters for pagination
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Get total count of bookings for this transport
+        const totalBookings = await Booking.countDocuments({ transportId });
+
+        // Find all bookings for the specified transport with pagination
+        const bookings = await Booking.find({ transportId })
+            .sort({ bookingDate: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        // Get transport details
+        const transport = await Transport.findById(transportId);
+        if (!transport) {
+            return res.status(404).json({ error: 'Transport not found' });
+        }
+
+        const transportDetails = {
+            type: transport.type,
+            name: transport.name,
+            source: transport.source,
+            destination: transport.destination,
+            departureTime: transport.departureTime,
+            arrivalTime: transport.arrivalTime
+        };
+
+        res.json({
+            bookings,
+            transportDetails,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalBookings / limit),
+                totalBookings,
+                hasMore: page * limit < totalBookings
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+

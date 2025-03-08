@@ -24,7 +24,30 @@ exports.loginUser = async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
         const token = generateToken(user._id, user.isAdmin);
-        res.json({ token });
+        res.json({ token,user });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+exports.getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.status(200).json(users);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.deleteUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const deletedUser = await User.findByIdAndDelete(userId);
+        
+        if (!deletedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        res.status(200).json({ message: 'User deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
